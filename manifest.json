@@ -1,0 +1,22 @@
+{
+  "manifest_version": 3,
+  "name": "Chrome Stock Monitor",
+  "description": "轻量化 Chrome 股票监控插件，支持 A 股、港股、美股和 badge 提醒。",
+  "version": "0.1.0",
+  "action": {
+    "default_title": "股票监控",
+    "default_popup": "popup.html"
+  },
+  "background": {
+    "service_worker": "scripts/background.js",
+    "type": "module"
+  },
+  "permissions": [
+    "storage",
+    "alarms"
+  ],
+  "host_permissions": [
+    "https://qt.gtimg.cn/*",
+    "https://smartbox.gtimg.cn/*"
+  ]
+}
