@@ -1,6 +1,15 @@
 import { MARKETS } from "./config.js";
 
 function toNumber(value) {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  const text = String(value).trim();
+  if (!text) {
+    return null;
+  }
+
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
 }
@@ -29,6 +38,7 @@ export function evaluateAlerts({
           lastTriggeredAt: previous.price?.lastTriggeredAt || null
         }
       };
+      let stockTriggered = false;
 
       if (settings.alertsEnabled && quote && !quote.error) {
         const changeThreshold = toNumber(stock.alerts?.changeThreshold);
@@ -45,7 +55,7 @@ export function evaluateAlerts({
           if (!previous.change?.active) {
             itemState.change.lastTriggeredAt = now;
           }
-          activeCount += 1;
+          stockTriggered = true;
         }
 
         if (settings.priceAlertEnabled && priceTarget !== null) {
@@ -60,9 +70,13 @@ export function evaluateAlerts({
             if (!previous.price?.active) {
               itemState.price.lastTriggeredAt = now;
             }
-            activeCount += 1;
+            stockTriggered = true;
           }
         }
+      }
+
+      if (stockTriggered) {
+        activeCount += 1;
       }
 
       nextAlertState[stock.id] = itemState;
@@ -77,6 +91,6 @@ export function evaluateAlerts({
 
 export function countActiveAlerts(alertState = {}) {
   return Object.values(alertState).reduce((total, state) => {
-    return total + (state.change?.active ? 1 : 0) + (state.price?.active ? 1 : 0);
+    return total + (state.change?.active || state.price?.active ? 1 : 0);
   }, 0);
 }

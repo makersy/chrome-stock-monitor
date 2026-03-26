@@ -20,7 +20,8 @@
     - 美股：`AAPL`
 - 行情刷新：
   - popup 内手动刷新
-  - 后台自动刷新（`chrome.alarms`）
+  - popup / 后台自动刷新（`1-30s` 任意整数）
+  - 后台秒级调度由 `offscreen document + setInterval` 驱动
 - 行情展示：
   - 最新价格
   - 涨跌额
@@ -65,6 +66,7 @@
 .
 ├── manifest.json
 ├── popup.html
+├── offscreen.html
 ├── README.md
 ├── styles/
 │   └── popup.css
@@ -72,6 +74,7 @@
     ├── alerts.js
     ├── background.js
     ├── config.js
+    ├── offscreen-refresh.js
     ├── popup.js
     ├── storage.js
     ├── data/

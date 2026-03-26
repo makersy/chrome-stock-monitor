@@ -53,6 +53,9 @@ const searchRequestIds = {
   us: 0
 };
 
+const MIN_REFRESH_INTERVAL_SECONDS = 1;
+const MAX_REFRESH_INTERVAL_SECONDS = 30;
+
 let state = null;
 
 function escapeHtml(value) {
@@ -90,6 +93,45 @@ function getPriceClass(changePercent) {
     return "down";
   }
   return "flat";
+}
+
+function normalizeRefreshIntervalSeconds(value) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) {
+    return MAX_REFRESH_INTERVAL_SECONDS;
+  }
+
+  return Math.min(
+    MAX_REFRESH_INTERVAL_SECONDS,
+    Math.max(MIN_REFRESH_INTERVAL_SECONDS, Math.round(numeric))
+  );
+}
+
+function formatCompactCount(value) {
+  return value > 99 ? "99+" : String(value);
+}
+
+function getTriggeredStockCountByMarket(market) {
+  const stocks = state.watchlist[market] || [];
+  return stocks.reduce((total, stock) => {
+    const alertState = state.alertState[stock.id];
+    const triggered = Boolean(alertState?.change?.active || alertState?.price?.active);
+    return total + (triggered ? 1 : 0);
+  }, 0);
+}
+
+function renderStockBadges(quote, alertState) {
+  return [
+    alertState.change?.active
+      ? '<span class="alert-chip change" title="涨跌幅提醒已触发">幅</span>'
+      : "",
+    alertState.price?.active
+      ? '<span class="alert-chip price" title="目标价提醒已触发">价</span>'
+      : "",
+    quote.error ? `<span class="dot err"></span>` : ""
+  ]
+    .filter(Boolean)
+    .join("");
 }
 
 function getExistingIds(market) {
@@ -178,6 +220,9 @@ function renderMarketTabs() {
       ${MARKETS.map((market) => {
         const meta = MARKET_META[market];
         const active = market === uiState.activeMarket;
+        const stockCount = (state.watchlist[market] || []).length;
+        const triggeredCount = getTriggeredStockCountByMarket(market);
+        const hasTriggered = triggeredCount > 0;
         return `
           <button
             type="button"
@@ -190,7 +235,12 @@ function renderMarketTabs() {
             title="切换市场"
           >
             <span class="market-tab-flag" aria-hidden="true">${meta.badge}</span>
-            <span class="market-tab-count">${(state.watchlist[market] || []).length}</span>
+            <span class="market-tab-count" data-market-stock-count="${market}">${stockCount}</span>
+            <span
+              class="market-tab-alert-count ${hasTriggered ? "active" : ""}"
+              data-market-alert-count="${market}"
+              ${hasTriggered ? "" : 'style="display:none"'}
+            >${formatCompactCount(triggeredCount)}</span>
             <span class="sr-only">${meta.title}</span>
           </button>
         `;
@@ -235,21 +285,23 @@ function renderSettingsPage() {
         <div class="setting-item">
           <span class="setting-icon">⏱</span>
           <span class="setting-label">频率</span>
-          <select class="setting-select" data-setting-key="refreshIntervalMinutes">
-            <option value="1" ${
-              state.settings.refreshIntervalMinutes === 1 ? "selected" : ""
-            }>1m</option>
-            <option value="3" ${
-              state.settings.refreshIntervalMinutes === 3 ? "selected" : ""
-            }>3m</option>
-            <option value="5" ${
-              state.settings.refreshIntervalMinutes === 5 ? "selected" : ""
-            }>5m</option>
-          </select>
+          <div class="setting-number-wrap">
+            <input
+              class="setting-number"
+              type="number"
+              inputmode="numeric"
+              min="${MIN_REFRESH_INTERVAL_SECONDS}"
+              max="${MAX_REFRESH_INTERVAL_SECONDS}"
+              step="1"
+              data-setting-key="refreshIntervalSeconds"
+              value="${normalizeRefreshIntervalSeconds(state.settings.refreshIntervalSeconds)}"
+            />
+            <span class="setting-unit">秒</span>
+          </div>
         </div>
         <div class="setting-item">
           <span class="setting-icon">🔔</span>
-          <span class="setting-label">Badge</span>
+          <span class="setting-label">角标提醒</span>
           <label class="switch">
             <input type="checkbox" data-setting-key="alertsEnabled" ${
               state.settings.alertsEnabled ? "checked" : ""
@@ -360,22 +412,22 @@ function renderStockCard(stock) {
   const alertState = state.alertState[stock.id] || {};
   const priceClass = getPriceClass(quote.changePercent);
   const hasAlert = Boolean(stock.alerts.changeThreshold || stock.alerts.priceTarget);
-
-  const badges = [
-    alertState.change?.active ? `<span class="dot warn"></span>` : "",
-    alertState.price?.active ? `<span class="dot warn"></span>` : "",
-    quote.error ? `<span class="dot err"></span>` : ""
-  ].filter(Boolean).join("");
+  const badges = renderStockBadges(quote, alertState);
 
   return `
-    <article class="stock-line">
+    <article class="stock-line" data-stock-card="${stock.id}">
       <div class="sl-name">
-        <span class="sl-label">${escapeHtml(stock.name)}</span>
-        <span class="sl-code">${escapeHtml(stock.code)}</span>
-        ${badges}
+        <span class="sl-label" data-stock-name>${escapeHtml(stock.name)}</span>
+        <span class="sl-code" data-stock-code>${escapeHtml(stock.code)}</span>
+        <span class="sl-badges" data-stock-badges>${badges}</span>
       </div>
-      <span class="sl-price ${priceClass}">${formatCurrency(stock.market, quote.price)}</span>
-      <span class="sl-change ${priceClass}">${formatPercent(quote.changePercent)}</span>
+      <span class="sl-price ${priceClass}" data-stock-price>${formatCurrency(
+        stock.market,
+        quote.price
+      )}</span>
+      <span class="sl-change ${priceClass}" data-stock-change>${formatPercent(
+        quote.changePercent
+      )}</span>
       <div class="sl-actions">
         <button type="button" class="icon-action-sm ${hasAlert ? "active" : ""}" data-action="toggle-alert-editor" data-stock-id="${stock.id}" title="提醒" aria-label="提醒">🔔</button>
         <button type="button" class="icon-action-sm danger" data-action="delete-stock" data-market="${stock.market}" data-stock-id="${stock.id}" title="删除" aria-label="删除">✕</button>
@@ -391,6 +443,7 @@ function renderMarketColumn(market) {
   const marketStatus = state.meta.marketStatus[market] || {};
 
   const statusIcon = marketStatus.loading ? "⟳" : marketStatus.error ? "!" : "";
+  const statusClass = marketStatus.loading ? "loading" : marketStatus.error ? "error" : "";
 
   return `
     <section class="market">
@@ -404,7 +457,11 @@ function renderMarketColumn(market) {
             value="${escapeHtml(uiState.search[market])}"
             placeholder="${meta.hint}"
           />
-          ${statusIcon ? `<span class="search-status ${marketStatus.error ? "error" : "loading"}">${statusIcon}</span>` : ""}
+          <span
+            class="search-status ${statusClass}"
+            data-market-status="${market}"
+            ${statusIcon ? "" : 'style="display:none"'}
+          >${statusIcon}</span>
         </div>
         ${renderSuggestions(market)}
       </div>
@@ -456,6 +513,145 @@ function focusSearchInput(market, cursorPosition) {
 async function refreshState() {
   state = await getStorageState();
   render();
+}
+
+function updateTrendClass(element, baseClass, changePercent) {
+  if (!(element instanceof HTMLElement)) {
+    return;
+  }
+
+  element.className = `${baseClass} ${getPriceClass(changePercent)}`;
+}
+
+function patchMarketStatus(market) {
+  const statusElement = app.querySelector(`[data-market-status="${market}"]`);
+  if (!(statusElement instanceof HTMLElement)) {
+    return;
+  }
+
+  const marketStatus = state.meta.marketStatus[market] || {};
+  const statusIcon = marketStatus.loading ? "⟳" : marketStatus.error ? "!" : "";
+
+  statusElement.textContent = statusIcon;
+  statusElement.classList.remove("loading", "error");
+  if (marketStatus.loading) {
+    statusElement.classList.add("loading");
+  } else if (marketStatus.error) {
+    statusElement.classList.add("error");
+  }
+  statusElement.style.display = statusIcon ? "" : "none";
+}
+
+function patchVisibleStockCards() {
+  const activeStocks = state.watchlist[uiState.activeMarket] || [];
+  const stockById = new Map(activeStocks.map((stock) => [stock.id, stock]));
+  const cards = app.querySelectorAll("[data-stock-card]");
+
+  cards.forEach((card) => {
+    if (!(card instanceof HTMLElement)) {
+      return;
+    }
+
+    const stockId = card.dataset.stockCard;
+    if (!stockId || !stockById.has(stockId)) {
+      return;
+    }
+
+    const stock = stockById.get(stockId);
+    const quote = state.quotes[stockId] || {};
+    const alertState = state.alertState[stockId] || {};
+
+    const nameEl = card.querySelector("[data-stock-name]");
+    if (nameEl instanceof HTMLElement) {
+      nameEl.textContent = stock.name;
+    }
+
+    const codeEl = card.querySelector("[data-stock-code]");
+    if (codeEl instanceof HTMLElement) {
+      codeEl.textContent = stock.code;
+    }
+
+    const badgesEl = card.querySelector("[data-stock-badges]");
+    if (badgesEl instanceof HTMLElement) {
+      badgesEl.innerHTML = renderStockBadges(quote, alertState);
+    }
+
+    const priceEl = card.querySelector("[data-stock-price]");
+    if (priceEl instanceof HTMLElement) {
+      priceEl.textContent = formatCurrency(stock.market, quote.price);
+      updateTrendClass(priceEl, "sl-price", quote.changePercent);
+    }
+
+    const changeEl = card.querySelector("[data-stock-change]");
+    if (changeEl instanceof HTMLElement) {
+      changeEl.textContent = formatPercent(quote.changePercent);
+      updateTrendClass(changeEl, "sl-change", quote.changePercent);
+    }
+  });
+}
+
+function patchMarketTabs() {
+  MARKETS.forEach((market) => {
+    const stockCountEl = app.querySelector(`[data-market-stock-count="${market}"]`);
+    if (stockCountEl instanceof HTMLElement) {
+      stockCountEl.textContent = String((state.watchlist[market] || []).length);
+    }
+
+    const alertCountEl = app.querySelector(`[data-market-alert-count="${market}"]`);
+    if (!(alertCountEl instanceof HTMLElement)) {
+      return;
+    }
+
+    const triggeredCount = getTriggeredStockCountByMarket(market);
+    alertCountEl.textContent = formatCompactCount(triggeredCount);
+    if (triggeredCount > 0) {
+      alertCountEl.classList.add("active");
+      alertCountEl.style.display = "";
+      return;
+    }
+
+    alertCountEl.classList.remove("active");
+    alertCountEl.style.display = "none";
+  });
+}
+
+function patchQuoteRelatedView() {
+  if (!state || uiState.settingsOpen) {
+    return;
+  }
+
+  patchMarketTabs();
+  MARKETS.forEach((market) => patchMarketStatus(market));
+  patchVisibleStockCards();
+}
+
+function getAlertSignature(alerts = {}) {
+  return [
+    alerts.changeThreshold || "",
+    alerts.priceTarget || "",
+    alerts.priceDirection === "lte" ? "lte" : "gte"
+  ].join(":");
+}
+
+function getWatchlistStructureSignature(watchlist = {}) {
+  return MARKETS.map((market) => {
+    const items = Array.isArray(watchlist[market]) ? watchlist[market] : [];
+    return items
+      .map((stock) => {
+        if (!stock) {
+          return "";
+        }
+        return `${stock.id}|${stock.market}|${stock.symbol}|${getAlertSignature(stock.alerts)}`;
+      })
+      .join(",");
+  }).join("||");
+}
+
+function hasWatchlistStructureChanged(previousWatchlist, nextWatchlist) {
+  return (
+    getWatchlistStructureSignature(previousWatchlist) !==
+    getWatchlistStructureSignature(nextWatchlist)
+  );
 }
 
 function sendMessage(message) {
@@ -523,8 +719,12 @@ async function handleDeleteStock(button) {
 
 async function handleSettingChange(target) {
   const key = target.dataset.settingKey;
-  const value =
-    target.type === "checkbox" ? target.checked : Number(target.value || "1");
+  let value = target.type === "checkbox" ? target.checked : Number(target.value || "1");
+
+  if (key === "refreshIntervalSeconds") {
+    value = normalizeRefreshIntervalSeconds(target.value);
+    target.value = String(value);
+  }
 
   await updateSettings({ [key]: value });
   await refreshState();
@@ -701,6 +901,10 @@ document.addEventListener("click", (event) => {
     return;
   }
 
+  if (uiState.settingsOpen) {
+    return;
+  }
+
   if (!target.closest(".add-panel")) {
     let changed = false;
     MARKETS.forEach((market) => {
@@ -721,9 +925,34 @@ chrome.storage.onChanged.addListener((_changes, areaName) => {
     return;
   }
 
-  const shouldRefresh = STORAGE_KEYS.some((key) => Object.hasOwn(_changes, key));
-  if (shouldRefresh) {
+  const changedKeys = STORAGE_KEYS.filter((key) => Object.hasOwn(_changes, key));
+  if (!changedKeys.length) {
+    return;
+  }
+
+  if (!state) {
     void refreshState();
+    return;
+  }
+
+  changedKeys.forEach((key) => {
+    state[key] = _changes[key]?.newValue;
+  });
+
+  const watchlistStructureChanged = _changes.watchlist
+    ? hasWatchlistStructureChanged(_changes.watchlist.oldValue, _changes.watchlist.newValue)
+    : false;
+  const shouldFullRender = changedKeys.some((key) => key === "settings") || watchlistStructureChanged;
+  if (shouldFullRender) {
+    render();
+    return;
+  }
+
+  const shouldPatchQuotes = changedKeys.some(
+    (key) => key === "watchlist" || key === "quotes" || key === "alertState" || key === "meta"
+  );
+  if (shouldPatchQuotes) {
+    patchQuoteRelatedView();
   }
 });
 

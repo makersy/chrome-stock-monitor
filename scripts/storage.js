@@ -74,14 +74,20 @@ export function normalizeWatchlist(watchlist = {}) {
 }
 
 export function normalizeSettings(settings = {}) {
-  const interval = Number(settings.refreshIntervalMinutes);
+  const restSettings = { ...settings };
+  delete restSettings.refreshIntervalMinutes;
+  const intervalSeconds = Number(settings.refreshIntervalSeconds);
+  const legacyMinutes = Number(settings.refreshIntervalMinutes);
+  const normalizedInterval = Number.isFinite(intervalSeconds)
+    ? Math.min(30, Math.max(1, Math.round(intervalSeconds)))
+    : [1, 3, 5].includes(legacyMinutes)
+      ? 30
+      : DEFAULT_SETTINGS.refreshIntervalSeconds;
 
   return {
     ...DEFAULT_SETTINGS,
-    ...settings,
-    refreshIntervalMinutes: [1, 3, 5].includes(interval)
-      ? interval
-      : DEFAULT_SETTINGS.refreshIntervalMinutes,
+    ...restSettings,
+    refreshIntervalSeconds: normalizedInterval,
     autoRefresh: settings.autoRefresh ?? DEFAULT_SETTINGS.autoRefresh,
     alertsEnabled: settings.alertsEnabled ?? DEFAULT_SETTINGS.alertsEnabled,
     changeAlertEnabled:

@@ -13,7 +13,7 @@
   },
   "permissions": [
     "storage",
-    "alarms"
+    "offscreen"
   ],
   "host_permissions": [
     "https://qt.gtimg.cn/*",

@@ -29,7 +29,7 @@ export const MARKET_META = {
 
 export const DEFAULT_SETTINGS = Object.freeze({
   autoRefresh: true,
-  refreshIntervalMinutes: 1,
+  refreshIntervalSeconds: 30,
   alertsEnabled: true,
   changeAlertEnabled: true,
   priceAlertEnabled: true
@@ -69,5 +69,3 @@ export const DEFAULT_META = Object.freeze({
 });
 
 export const STORAGE_KEYS = ["watchlist", "quotes", "settings", "alertState", "meta"];
-
-export const REFRESH_ALARM_NAME = "stock-monitor-auto-refresh";
