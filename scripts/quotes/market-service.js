@@ -137,76 +137,103 @@ export async function fetchQuotesForWatchlist(watchlist) {
   const quotes = {};
   const marketStatus = {};
   const watchlistUpdates = {};
+  const stocksByMarket = {};
+  const allStocks = [];
 
-  await Promise.all(
-    MARKETS.map(async (market) => {
-      const stocks = watchlist[market] || [];
+  MARKETS.forEach((market) => {
+    const stocks = watchlist[market] || [];
+    stocksByMarket[market] = stocks;
 
+    if (!stocks.length) {
+      marketStatus[market] = {
+        loading: false,
+        error: "",
+        lastUpdated: null
+      };
+      return;
+    }
+
+    allStocks.push(...stocks);
+  });
+
+  if (!allStocks.length) {
+    return {
+      quotes,
+      marketStatus,
+      watchlistUpdates
+    };
+  }
+
+  try {
+    const aggregatedQuotes = await fetchMarketQuotes("all", allStocks);
+    const fetchedAt = new Date().toISOString();
+
+    MARKETS.forEach((market) => {
+      const stocks = stocksByMarket[market] || [];
       if (!stocks.length) {
-        marketStatus[market] = {
-          loading: false,
-          error: "",
-          lastUpdated: null
-        };
         return;
       }
 
-      try {
-        const marketQuotes = await fetchMarketQuotes(market, stocks);
-        const fetchedAt = new Date().toISOString();
+      marketStatus[market] = {
+        loading: false,
+        error: "",
+        lastUpdated: fetchedAt
+      };
 
-        marketStatus[market] = {
-          loading: false,
-          error: "",
-          lastUpdated: fetchedAt
-        };
-
-        stocks.forEach((stock) => {
-          const quote = marketQuotes[stock.symbol];
-          if (quote.error) {
-            quotes[stock.id] = {
-              error: quote.error,
-              market,
-              symbol: stock.symbol,
-              fetchedAt
-            };
-            return;
-          }
-
+      stocks.forEach((stock) => {
+        const quote = aggregatedQuotes[stock.symbol];
+        if (quote.error) {
           quotes[stock.id] = {
-            ...quote,
+            error: quote.error,
             market,
             symbol: stock.symbol,
             fetchedAt
           };
+          return;
+        }
 
-          if (quote.name && quote.name !== stock.name) {
-            watchlistUpdates[stock.id] = {
-              name: quote.name,
-              code: quote.code || stock.code,
-              isCustom: false
-            };
-          }
-        });
-      } catch (error) {
-        const fetchedAt = new Date().toISOString();
-        marketStatus[market] = {
-          loading: false,
-          error: error.message || "获取失败",
-          lastUpdated: null
+        quotes[stock.id] = {
+          ...quote,
+          market,
+          symbol: stock.symbol,
+          fetchedAt
         };
 
-        stocks.forEach((stock) => {
-          quotes[stock.id] = {
-            error: error.message || "获取失败",
-            market,
-            symbol: stock.symbol,
-            fetchedAt
+        if (quote.name && quote.name !== stock.name) {
+          watchlistUpdates[stock.id] = {
+            name: quote.name,
+            code: quote.code || stock.code,
+            isCustom: false
           };
-        });
+        }
+      });
+    });
+  } catch (error) {
+    const fetchedAt = new Date().toISOString();
+    const message = error.message || "获取失败";
+
+    MARKETS.forEach((market) => {
+      const stocks = stocksByMarket[market] || [];
+      if (!stocks.length) {
+        return;
       }
-    })
-  );
+
+      marketStatus[market] = {
+        loading: false,
+        error: message,
+        lastUpdated: null
+      };
+
+      stocks.forEach((stock) => {
+        quotes[stock.id] = {
+          error: message,
+          market,
+          symbol: stock.symbol,
+          fetchedAt
+        };
+      });
+    });
+  }
 
   return {
     quotes,
