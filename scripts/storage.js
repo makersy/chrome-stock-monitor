@@ -229,6 +229,45 @@ export async function removeWatchlistStock(market, stockId) {
   });
 }
 
+export async function reorderWatchlistStocks(market, orderedIds = []) {
+  const state = await getStorageState();
+  const nextWatchlist = normalizeWatchlist(state.watchlist);
+  const current = nextWatchlist[market] || [];
+
+  if (!current.length) {
+    return false;
+  }
+
+  const stockById = new Map(current.map((stock) => [stock.id, stock]));
+  const ids = Array.isArray(orderedIds) ? orderedIds : [];
+
+  const nextOrdered = [];
+  const seen = new Set();
+  ids.forEach((id) => {
+    if (!stockById.has(id) || seen.has(id)) {
+      return;
+    }
+    nextOrdered.push(stockById.get(id));
+    seen.add(id);
+  });
+
+  current.forEach((stock) => {
+    if (!seen.has(stock.id)) {
+      nextOrdered.push(stock);
+    }
+  });
+
+  const currentOrder = current.map((stock) => stock.id).join(",");
+  const nextOrder = nextOrdered.map((stock) => stock.id).join(",");
+  if (currentOrder === nextOrder) {
+    return false;
+  }
+
+  nextWatchlist[market] = nextOrdered;
+  await chrome.storage.local.set({ watchlist: nextWatchlist });
+  return true;
+}
+
 export async function updateStockAlerts(market, stockId, alerts) {
   const state = await getStorageState();
   const nextWatchlist = normalizeWatchlist(state.watchlist);

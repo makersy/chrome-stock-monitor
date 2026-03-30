@@ -2,6 +2,7 @@ import { MARKET_META, MARKETS, STORAGE_KEYS } from "./config.js";
 import { searchMarketSuggestions, shouldUseRemoteSearch } from "./data/search-provider.js";
 import {
   getStorageState,
+  reorderWatchlistStocks,
   removeWatchlistStock,
   updateSettings,
   updateStockAlerts,
@@ -44,7 +45,11 @@ const uiState = {
   },
   settingsOpen: false,
   openAlertEditorId: null,
-  errorMessage: ""
+  errorMessage: "",
+  dragSort: {
+    pending: null,
+    active: null
+  }
 };
 
 const searchRequestIds = {
@@ -55,6 +60,10 @@ const searchRequestIds = {
 
 const MIN_REFRESH_INTERVAL_SECONDS = 1;
 const MAX_REFRESH_INTERVAL_SECONDS = 30;
+const LONG_PRESS_DELAY_MS = 260;
+const LONG_PRESS_MOVE_THRESHOLD = 10;
+const EDGE_AUTO_SCROLL_ZONE = 40;
+const EDGE_AUTO_SCROLL_STEP = 12;
 
 let state = null;
 
@@ -212,6 +221,203 @@ function restoreActiveMarketScroll() {
   }
 
   body.scrollTop = uiState.marketScroll[uiState.activeMarket] || 0;
+}
+
+function isDragSortBusy() {
+  return Boolean(uiState.dragSort.pending || uiState.dragSort.active);
+}
+
+function releasePointerCaptureSafe(element, pointerId) {
+  if (!(element instanceof HTMLElement) || !Number.isInteger(pointerId)) {
+    return;
+  }
+
+  try {
+    if (element.hasPointerCapture(pointerId)) {
+      element.releasePointerCapture(pointerId);
+    }
+  } catch (_error) {
+    // Ignore environments that do not support pointer capture.
+  }
+}
+
+function clearPendingDragSort({ removePendingClass = true } = {}) {
+  const pending = uiState.dragSort.pending;
+  if (!pending) {
+    return null;
+  }
+
+  if (Number.isInteger(pending.timerId)) {
+    clearTimeout(pending.timerId);
+  }
+  if (removePendingClass && pending.lineEl instanceof HTMLElement) {
+    pending.lineEl.classList.remove("reorder-pending");
+  }
+  releasePointerCaptureSafe(pending.lineEl, pending.pointerId);
+  uiState.dragSort.pending = null;
+  return pending;
+}
+
+function cleanupActiveDragSort(active) {
+  if (!active) {
+    return;
+  }
+
+  if (active.lineEl) {
+    active.lineEl.classList.remove("drag-active", "reorder-pending");
+    active.lineEl.style.position = "";
+    active.lineEl.style.top = "";
+    active.lineEl.style.left = "";
+    active.lineEl.style.width = "";
+    active.lineEl.style.zIndex = "";
+    active.lineEl.style.pointerEvents = "";
+  }
+
+  if (active.placeholderEl) {
+    active.placeholderEl.remove();
+  }
+
+  releasePointerCaptureSafe(active.lineEl, active.pointerId);
+}
+
+function updateDragSortPlaceholder(clientY) {
+  const active = uiState.dragSort.active;
+  if (!active) {
+    return;
+  }
+
+  const bodyRect = active.bodyEl.getBoundingClientRect();
+  if (clientY < bodyRect.top + EDGE_AUTO_SCROLL_ZONE) {
+    active.bodyEl.scrollTop -= EDGE_AUTO_SCROLL_STEP;
+  } else if (clientY > bodyRect.bottom - EDGE_AUTO_SCROLL_ZONE) {
+    active.bodyEl.scrollTop += EDGE_AUTO_SCROLL_STEP;
+  }
+
+  const nextTop = clientY - active.offsetY;
+  active.lineEl.style.top = `${nextTop}px`;
+
+  const cards = Array.from(active.listEl.querySelectorAll(".stock-line")).filter(
+    (card) => card !== active.lineEl
+  );
+
+  let insertBefore = null;
+  for (const card of cards) {
+    const rect = card.getBoundingClientRect();
+    if (clientY < rect.top + rect.height / 2) {
+      insertBefore = card;
+      break;
+    }
+  }
+
+  if (insertBefore) {
+    active.listEl.insertBefore(active.placeholderEl, insertBefore);
+  } else {
+    active.listEl.append(active.placeholderEl);
+  }
+}
+
+function activatePendingDragSort(pointerId, clientY) {
+  const pending = uiState.dragSort.pending;
+  if (!pending || pending.pointerId !== pointerId) {
+    return;
+  }
+
+  const lineEl = pending.lineEl;
+  if (!(lineEl instanceof HTMLElement) || !lineEl.isConnected) {
+    clearPendingDragSort();
+    return;
+  }
+
+  const bodyEl = lineEl.closest("[data-market-body='1']");
+  const listEl = lineEl.closest(".list");
+  if (!(bodyEl instanceof HTMLElement) || !(listEl instanceof HTMLElement)) {
+    clearPendingDragSort();
+    return;
+  }
+
+  const rect = lineEl.getBoundingClientRect();
+  const placeholderEl = document.createElement("div");
+  placeholderEl.className = "stock-line drag-placeholder";
+  placeholderEl.style.height = `${rect.height}px`;
+  placeholderEl.setAttribute("aria-hidden", "true");
+
+  listEl.insertBefore(placeholderEl, lineEl.nextElementSibling);
+  lineEl.classList.remove("reorder-pending");
+  lineEl.classList.add("drag-active");
+  lineEl.style.position = "fixed";
+  lineEl.style.left = `${rect.left}px`;
+  lineEl.style.top = `${rect.top}px`;
+  lineEl.style.width = `${rect.width}px`;
+  lineEl.style.zIndex = "1000";
+  lineEl.style.pointerEvents = "none";
+
+  try {
+    lineEl.setPointerCapture(pointerId);
+  } catch (_error) {
+    // Ignore environments that do not support pointer capture.
+  }
+
+  uiState.dragSort.active = {
+    pointerId,
+    market: pending.market,
+    stockId: pending.stockId,
+    lineEl,
+    listEl,
+    bodyEl,
+    placeholderEl,
+    offsetY: clientY - rect.top
+  };
+
+  clearPendingDragSort({ removePendingClass: false });
+  updateDragSortPlaceholder(clientY);
+}
+
+async function finishActiveDragSort() {
+  const active = uiState.dragSort.active;
+  if (!active) {
+    return;
+  }
+
+  const { lineEl, placeholderEl, listEl, market } = active;
+  if (placeholderEl instanceof HTMLElement && placeholderEl.isConnected) {
+    listEl.insertBefore(lineEl, placeholderEl);
+  }
+
+  cleanupActiveDragSort(active);
+  uiState.dragSort.active = null;
+
+  const orderedIds = Array.from(listEl.querySelectorAll(".stock-line"))
+    .map((card) => card.dataset.stockCard)
+    .filter(Boolean);
+
+  try {
+    const changed = await reorderWatchlistStocks(market, orderedIds);
+    if (changed) {
+      await sendMessage({ type: "SYNC_BADGE" }).catch((error) => {
+        throw error;
+      });
+    }
+  } catch (error) {
+    uiState.errorMessage = error.message || "更新排序失败";
+  }
+
+  render();
+}
+
+function cancelDragSort() {
+  clearPendingDragSort();
+  const active = uiState.dragSort.active;
+  if (!active) {
+    return;
+  }
+
+  const { lineEl, placeholderEl, listEl } = active;
+  if (placeholderEl instanceof HTMLElement && placeholderEl.isConnected) {
+    listEl.insertBefore(lineEl, placeholderEl);
+  }
+  cleanupActiveDragSort(active);
+  uiState.dragSort.active = null;
+  render();
 }
 
 function renderMarketTabs() {
@@ -415,7 +621,8 @@ function renderStockCard(stock) {
   const badges = renderStockBadges(quote, alertState);
 
   return `
-    <article class="stock-line" data-stock-card="${stock.id}">
+    <article class="stock-line" data-stock-card="${stock.id}" data-market="${stock.market}">
+      <span class="sl-grip" title="长按拖动排序" aria-hidden="true">⋮⋮</span>
       <div class="sl-name">
         <span class="sl-label" data-stock-name>${escapeHtml(stock.name)}</span>
         <span class="sl-code" data-stock-code>${escapeHtml(stock.code)}</span>
@@ -616,7 +823,7 @@ function patchMarketTabs() {
 }
 
 function patchQuoteRelatedView() {
-  if (!state || uiState.settingsOpen) {
+  if (!state || uiState.settingsOpen || isDragSortBusy()) {
     return;
   }
 
@@ -758,6 +965,104 @@ async function resetAlerts(button) {
   await refreshState();
   await sendMessage({ type: "SYNC_BADGE" });
 }
+
+app.addEventListener("pointerdown", (event) => {
+  const target = event.target;
+  if (!(target instanceof HTMLElement)) {
+    return;
+  }
+
+  if (uiState.settingsOpen || uiState.openAlertEditorId) {
+    return;
+  }
+
+  const grip = target.closest(".sl-grip");
+  if (!(grip instanceof HTMLElement)) {
+    return;
+  }
+
+  if (event.pointerType === "mouse" && event.button !== 0) {
+    return;
+  }
+
+  const lineEl = grip.closest(".stock-line");
+  if (!(lineEl instanceof HTMLElement)) {
+    return;
+  }
+
+  const market = lineEl.dataset.market;
+  const stockId = lineEl.dataset.stockCard;
+  if (!market || !MARKETS.includes(market) || !stockId) {
+    return;
+  }
+
+  clearPendingDragSort();
+  const pointerId = event.pointerId;
+  const timerId = setTimeout(() => {
+    activatePendingDragSort(pointerId, uiState.dragSort.pending?.lastY ?? event.clientY);
+  }, LONG_PRESS_DELAY_MS);
+
+  lineEl.classList.add("reorder-pending");
+  uiState.dragSort.pending = {
+    pointerId,
+    market,
+    stockId,
+    lineEl,
+    startX: event.clientX,
+    startY: event.clientY,
+    lastY: event.clientY,
+    timerId
+  };
+});
+
+app.addEventListener(
+  "pointermove",
+  (event) => {
+    const active = uiState.dragSort.active;
+    const pending = uiState.dragSort.pending;
+    if (!active && !pending) {
+      return;
+    }
+
+    if (active && active.pointerId === event.pointerId) {
+      event.preventDefault();
+      updateDragSortPlaceholder(event.clientY);
+      return;
+    }
+
+    if (!pending || pending.pointerId !== event.pointerId) {
+      return;
+    }
+
+    pending.lastY = event.clientY;
+    const deltaX = Math.abs(event.clientX - pending.startX);
+    const deltaY = Math.abs(event.clientY - pending.startY);
+    if (deltaX > LONG_PRESS_MOVE_THRESHOLD || deltaY > LONG_PRESS_MOVE_THRESHOLD) {
+      clearPendingDragSort();
+    }
+  },
+  { passive: false }
+);
+
+app.addEventListener("pointerup", async (event) => {
+  if (uiState.dragSort.pending?.pointerId === event.pointerId) {
+    clearPendingDragSort();
+    return;
+  }
+
+  if (uiState.dragSort.active?.pointerId === event.pointerId) {
+    await finishActiveDragSort();
+  }
+});
+
+app.addEventListener("pointercancel", (event) => {
+  if (
+    uiState.dragSort.pending?.pointerId === event.pointerId ||
+    uiState.dragSort.active?.pointerId === event.pointerId
+  ) {
+    cancelDragSort();
+  }
+});
 
 app.addEventListener("click", async (event) => {
   const target = event.target.closest("[data-action]");
@@ -938,6 +1243,10 @@ chrome.storage.onChanged.addListener((_changes, areaName) => {
   changedKeys.forEach((key) => {
     state[key] = _changes[key]?.newValue;
   });
+
+  if (isDragSortBusy()) {
+    return;
+  }
 
   const watchlistStructureChanged = _changes.watchlist
     ? hasWatchlistStructureChanged(_changes.watchlist.oldValue, _changes.watchlist.newValue)
