@@ -22,7 +22,7 @@ html, body {
 }
 
 body {
-  min-height: 560px;
+  min-height: 320px;
   overflow-x: clip;
   color: var(--ink);
   font-family: -apple-system, "PingFang SC", "Hiragino Sans GB", sans-serif;
@@ -146,7 +146,7 @@ input, select { color: var(--ink); }
 
 .market {
   display: grid; grid-template-rows: auto minmax(0, 1fr);
-  gap: 8px; min-height: 480px;
+  gap: 8px;
   padding: 10px; border: 1px solid var(--line); border-radius: var(--radius);
   background: var(--panel);
 }
