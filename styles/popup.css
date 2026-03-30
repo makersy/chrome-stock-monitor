@@ -19,19 +19,26 @@ html, body {
   margin: 0;
   width: 440px;
   min-width: 440px;
-  height: 320px;
 }
+
+html {
+  height: 320px;
+  overflow: hidden;
+}
+
+body {
+  height: 100%;
   overflow-x: clip;
   color: var(--ink);
   font-family: -apple-system, "PingFang SC", "Hiragino Sans GB", sans-serif;
   background: linear-gradient(180deg, #f8fafc, #f1f4f9);
 }
 
+#app { padding: 10px; width: 100%; box-sizing: border-box; }
+
 button, input, select { font: inherit; }
 button { border: 0; cursor: pointer; }
 input, select { color: var(--ink); }
-
-#app { padding: 10px; width: 100%; }
 
 .shell { display: grid; gap: 8px; }
 
