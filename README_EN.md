@@ -15,6 +15,7 @@ No signup, no backend — install and go.
 - **Change Alerts**: Set a % threshold — get notified when exceeded
 - **Price Alerts**: Set a target price with direction (≥ / ≤) — get notified on hit
 - **Badge Alerts**: Triggered stock count shown directly on the extension icon
+- **Drag & Drop Reorder**: Long-press the grip handle on the left of a stock card to drag and reorder
 
 ## Install
 
@@ -34,6 +35,7 @@ git clone https://github.com/makersy/chrome-stock-monitor.git
 3. Search by stock code or name, then click to add
 4. Tap 🔔 to set a change threshold or target price
 5. Tap ⚙ to open settings and configure auto-refresh and alerts
+6. Long-press the ⋮⋮ grip handle on any stock card to drag and reorder
 
 ## Data Sources
 

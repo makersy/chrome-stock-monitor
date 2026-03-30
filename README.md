@@ -35,6 +35,7 @@ git clone https://github.com/makersy/chrome-stock-monitor.git
 3. 在搜索框输入股票代码或名称，点击添加
 4. 点击 🔔 图标设置涨跌幅阈值或目标价
 5. 点击 ⚙ 进入设置，调整自动刷新和提醒开关
+6. 长按股票卡片左侧的 ⋮⋮ 手柄，拖动调整排列顺序
 
 ## 数据来源
 
