@@ -19,10 +19,8 @@ html, body {
   margin: 0;
   width: 440px;
   min-width: 440px;
+  height: 320px;
 }
-
-body {
-  min-height: 320px;
   overflow-x: clip;
   color: var(--ink);
   font-family: -apple-system, "PingFang SC", "Hiragino Sans GB", sans-serif;
