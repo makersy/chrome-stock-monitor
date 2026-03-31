@@ -60,7 +60,7 @@ const searchRequestIds = {
 
 const MIN_REFRESH_INTERVAL_SECONDS = 1;
 const MAX_REFRESH_INTERVAL_SECONDS = 30;
-const LONG_PRESS_DELAY_MS = 150;
+const LONG_PRESS_DELAY_MS = 0;
 const LONG_PRESS_MOVE_THRESHOLD = 10;
 const EDGE_AUTO_SCROLL_ZONE = 30;
 const EDGE_AUTO_SCROLL_STEP = 8;
@@ -622,7 +622,7 @@ function renderStockCard(stock) {
 
   return `
     <article class="stock-line" data-stock-card="${stock.id}" data-market="${stock.market}">
-      <span class="sl-grip" title="长按拖动排序" aria-hidden="true">⋮⋮</span>
+      <span class="sl-grip" title="按住拖动排序" aria-hidden="true">⋮⋮</span>
       <div class="sl-name">
         <span class="sl-label" data-stock-name>${escapeHtml(stock.name)}</span>
         <span class="sl-code" data-stock-code>${escapeHtml(stock.code)}</span>
@@ -998,10 +998,6 @@ app.addEventListener("pointerdown", (event) => {
 
   clearPendingDragSort();
   const pointerId = event.pointerId;
-  const timerId = setTimeout(() => {
-    activatePendingDragSort(pointerId, uiState.dragSort.pending?.lastY ?? event.clientY);
-  }, LONG_PRESS_DELAY_MS);
-
   lineEl.classList.add("reorder-pending");
   uiState.dragSort.pending = {
     pointerId,
@@ -1011,8 +1007,17 @@ app.addEventListener("pointerdown", (event) => {
     startX: event.clientX,
     startY: event.clientY,
     lastY: event.clientY,
-    timerId
+    timerId: null
   };
+
+  if (LONG_PRESS_DELAY_MS <= 0) {
+    activatePendingDragSort(pointerId, event.clientY);
+    return;
+  }
+
+  uiState.dragSort.pending.timerId = setTimeout(() => {
+    activatePendingDragSort(pointerId, uiState.dragSort.pending?.lastY ?? event.clientY);
+  }, LONG_PRESS_DELAY_MS);
 });
 
 app.addEventListener(
