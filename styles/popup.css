@@ -248,6 +248,7 @@ input, select { color: var(--ink); }
   touch-action: pan-y;
   user-select: none;
   -webkit-user-select: none;
+  min-width: 0;
 }
 
 .stock-line.reorder-pending {
