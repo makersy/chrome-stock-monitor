@@ -268,7 +268,7 @@ input, select { color: var(--ink); }
 
 .sl-name {
   display: flex; align-items: center; gap: 4px;
-  flex: 1; min-width: 0;
+  flex: 1; min-width: 0; overflow: hidden;
 }
 .sl-grip {
   color: rgba(21,32,51,0.35);
