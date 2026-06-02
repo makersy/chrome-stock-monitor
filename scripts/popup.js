@@ -672,8 +672,8 @@ function renderMarketColumn(market) {
   const stocks = state.watchlist[market] || [];
   const marketStatus = state.meta.marketStatus[market] || {};
 
-  const statusIcon = marketStatus.loading ? "⟳" : marketStatus.error ? "!" : "";
-  const statusClass = marketStatus.loading ? "loading" : marketStatus.error ? "error" : "";
+  const statusIcon = marketStatus.error ? "!" : "";
+  const statusClass = marketStatus.error ? "error" : "";
 
   return `
     <section class="market">
@@ -760,13 +760,11 @@ function patchMarketStatus(market) {
   }
 
   const marketStatus = state.meta.marketStatus[market] || {};
-  const statusIcon = marketStatus.loading ? "⟳" : marketStatus.error ? "!" : "";
+  const statusIcon = marketStatus.error ? "!" : "";
 
   statusElement.textContent = statusIcon;
   statusElement.classList.remove("loading", "error");
-  if (marketStatus.loading) {
-    statusElement.classList.add("loading");
-  } else if (marketStatus.error) {
+  if (marketStatus.error) {
     statusElement.classList.add("error");
   }
   statusElement.style.display = statusIcon ? "" : "none";
