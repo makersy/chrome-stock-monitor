@@ -1,4 +1,4 @@
-name: Build CRX
+name: Build & Release
 
 on:
   push:
@@ -12,16 +12,20 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-      - name: Build CRX
+
+      - name: Package extension
         run: |
-          npx crx3 --zip . --key /dev/null -o chrome-stock-monitor.crx || \
-          (apt-get update && apt-get install -y chromium-browser && \
-           chromium-browser --pack-extension=. --pack-extension-key=/dev/null)
+          # Exclude dev/CI files from the zip
+          zip -r chrome-stock-monitor.zip . \
+            -x ".git/*" \
+            -x ".github/*" \
+            -x ".gitignore" \
+            -x ".DS_Store" \
+            -x "node_modules/*" \
+            -x "*.log"
+
       - name: Create Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
-          files: "*.crx"
+          files: "chrome-stock-monitor.zip"
           generate_release_notes: true
