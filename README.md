@@ -17,6 +17,13 @@
 - **Badge 提醒**：触发的股票数量直接显示在扩展图标上
 - **拖拽排序**：长按股票卡片左侧 grip 手柄，拖动调整排列顺序
 
+## 快速安装（推荐）
+
+1. 从 [Releases](https://github.com/makersy/chrome-stock-monitor/releases) 下载最新 `.crx` 文件
+2. 打开 Chrome，地址栏输入 `chrome://extensions/`
+3. 开启右上角「开发者模式」
+4. 将 `.crx` 文件拖入浏览器即可安装
+
 ## 安装
 
 ```bash

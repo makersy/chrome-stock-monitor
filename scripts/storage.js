@@ -290,6 +290,15 @@ export async function updateStockAlerts(market, stockId, alerts) {
   });
 }
 
+export async function getUiState() {
+  const { uiState } = await chrome.storage.local.get("uiState");
+  return uiState || { activeMarket: "a", marketScroll: { a: 0, hk: 0, us: 0 } };
+}
+
+export async function saveUiState(state) {
+  await chrome.storage.local.set({ uiState: state });
+}
+
 export async function updateSettings(settingsPatch) {
   const state = await getStorageState();
   const nextSettings = normalizeSettings({

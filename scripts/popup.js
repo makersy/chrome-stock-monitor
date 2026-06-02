@@ -1,9 +1,12 @@
 import { MARKET_META, MARKETS, STORAGE_KEYS } from "./config.js";
+import { initI18n, t, getLang, setLang } from "./i18n.js";
 import { searchMarketSuggestions, shouldUseRemoteSearch } from "./data/search-provider.js";
 import {
   getStorageState,
+  getUiState,
   reorderWatchlistStocks,
   removeWatchlistStock,
+  saveUiState,
   updateSettings,
   updateStockAlerts,
   upsertWatchlistStock
@@ -66,6 +69,7 @@ const EDGE_AUTO_SCROLL_ZONE = 30;
 const EDGE_AUTO_SCROLL_STEP = 8;
 
 let state = null;
+let scrollSaveTimer = null;
 
 function escapeHtml(value) {
   return String(value)
@@ -398,7 +402,7 @@ async function finishActiveDragSort() {
       });
     }
   } catch (error) {
-    uiState.errorMessage = error.message || "更新排序失败";
+    uiState.errorMessage = error.message || t("error.sortFailed");
   }
 
   render();
@@ -422,7 +426,7 @@ function cancelDragSort() {
 
 function renderMarketTabs() {
   return `
-    <section class="market-tabs" role="tablist" aria-label="市场切换">
+    <section class="market-tabs" role="tablist" aria-label="${t("market.switch")}">
       ${MARKETS.map((market) => {
         const meta = MARKET_META[market];
         const active = market === uiState.activeMarket;
@@ -438,7 +442,7 @@ function renderMarketTabs() {
             data-accent="${meta.accent}"
             role="tab"
             aria-selected="${active ? "true" : "false"}"
-            title="切换市场"
+            title="${t("market.switch")}"
           >
             <span class="market-tab-flag" aria-hidden="true">${meta.badge}</span>
             <span class="market-tab-count" data-market-stock-count="${market}">${stockCount}</span>
@@ -447,7 +451,7 @@ function renderMarketTabs() {
               data-market-alert-count="${market}"
               ${hasTriggered ? "" : 'style="display:none"'}
             >${formatCompactCount(triggeredCount)}</span>
-            <span class="sr-only">${meta.title}</span>
+            <span class="sr-only">${t(meta.titleKey)}</span>
           </button>
         `;
       }).join("")}
@@ -463,24 +467,25 @@ function renderControlRow() {
         type="button"
         class="market-tab settings-btn"
         data-action="toggle-settings"
-        title="设置"
-        aria-label="设置"
+        title="${t("settings.title")}"
+        aria-label="${t("settings.title")}"
       >⚙</button>
     </section>
   `;
 }
 
 function renderSettingsPage() {
+  const lang = getLang();
   return `
     <div class="shell">
       <div class="page-header">
-        <button type="button" class="icon-action-sm" data-action="toggle-settings" title="返回" aria-label="返回">←</button>
-        <span class="page-title">设置</span>
+        <button type="button" class="icon-action-sm" data-action="toggle-settings" title="${t("settings.back")}" aria-label="${t("settings.back")}">←</button>
+        <span class="page-title">${t("settings.title")}</span>
       </div>
       <div class="settings-list">
         <div class="setting-item">
           <span class="setting-icon">⟳</span>
-          <span class="setting-label">自动刷新</span>
+          <span class="setting-label">${t("settings.autoRefresh")}</span>
           <label class="switch">
             <input type="checkbox" data-setting-key="autoRefresh" ${
               state.settings.autoRefresh ? "checked" : ""
@@ -490,7 +495,7 @@ function renderSettingsPage() {
         </div>
         <div class="setting-item">
           <span class="setting-icon">⏱</span>
-          <span class="setting-label">频率</span>
+          <span class="setting-label">${t("settings.frequency")}</span>
           <div class="setting-number-wrap">
             <input
               class="setting-number"
@@ -502,12 +507,12 @@ function renderSettingsPage() {
               data-setting-key="refreshIntervalSeconds"
               value="${normalizeRefreshIntervalSeconds(state.settings.refreshIntervalSeconds)}"
             />
-            <span class="setting-unit">秒</span>
+            <span class="setting-unit">${t("settings.seconds")}</span>
           </div>
         </div>
         <div class="setting-item">
           <span class="setting-icon">🔔</span>
-          <span class="setting-label">角标提醒</span>
+          <span class="setting-label">${t("settings.badgeAlert")}</span>
           <label class="switch">
             <input type="checkbox" data-setting-key="alertsEnabled" ${
               state.settings.alertsEnabled ? "checked" : ""
@@ -517,7 +522,7 @@ function renderSettingsPage() {
         </div>
         <div class="setting-item">
           <span class="setting-icon">%</span>
-          <span class="setting-label">涨跌幅</span>
+          <span class="setting-label">${t("settings.changeAlert")}</span>
           <label class="switch">
             <input type="checkbox" data-setting-key="changeAlertEnabled" ${
               state.settings.changeAlertEnabled ? "checked" : ""
@@ -527,13 +532,31 @@ function renderSettingsPage() {
         </div>
         <div class="setting-item">
           <span class="setting-icon">¥</span>
-          <span class="setting-label">目标价</span>
+          <span class="setting-label">${t("settings.priceAlert")}</span>
           <label class="switch">
             <input type="checkbox" data-setting-key="priceAlertEnabled" ${
               state.settings.priceAlertEnabled ? "checked" : ""
             } />
             <span class="slider"></span>
           </label>
+        </div>
+        <div class="setting-item">
+          <span class="setting-icon">🌐</span>
+          <span class="setting-label">${t("settings.language")}</span>
+          <div class="lang-toggle">
+            <button
+              type="button"
+              class="lang-option ${lang === "zh" ? "active" : ""}"
+              data-action="set-lang"
+              data-lang="zh"
+            >${t("lang.zh")}</button>
+            <button
+              type="button"
+              class="lang-option ${lang === "en" ? "active" : ""}"
+              data-action="set-lang"
+              data-lang="en"
+            >${t("lang.en")}</button>
+          </div>
         </div>
       </div>
     </div>
@@ -563,7 +586,7 @@ function renderSuggestions(market) {
               data-code="${escapeHtml(stock.code)}"
               data-name="${escapeHtml(stock.name)}"
               data-custom="${stock.isCustom ? "1" : "0"}"
-              title="添加 ${escapeHtml(label)}"
+              title="${t("stock.add")} ${escapeHtml(label)}"
             >
               <div class="suggestion-copy">
                 <div class="suggestion-name">${escapeHtml(label)}</div>
@@ -578,7 +601,7 @@ function renderSuggestions(market) {
         .join("")}
       ${
         isLoading
-          ? '<div class="suggestion-state">正在补全更多全市场结果…</div>'
+          ? `<div class="suggestion-state">${t("search.loading")}</div>`
           : ""
       }
     </div>
@@ -596,18 +619,18 @@ function renderAlertEditor(stock) {
       stock.id
     }">
       <div class="alert-grid">
-        <input type="number" step="0.1" min="0" name="changeThreshold" value="${escapeHtml(alerts.changeThreshold || "")}" placeholder="涨跌幅 %" />
-        <input type="number" step="0.01" name="priceTarget" value="${escapeHtml(alerts.priceTarget || "")}" placeholder="目标价" />
+        <input type="number" step="0.1" min="0" name="changeThreshold" value="${escapeHtml(alerts.changeThreshold || "")}" placeholder="${t("alert.change.threshold")}" />
+        <input type="number" step="0.01" name="priceTarget" value="${escapeHtml(alerts.priceTarget || "")}" placeholder="${t("alert.price.target")}" />
         <select name="priceDirection">
-          <option value="gte" ${alerts.priceDirection !== "lte" ? "selected" : ""}>≥</option>
-          <option value="lte" ${alerts.priceDirection === "lte" ? "selected" : ""}>≤</option>
+          <option value="gte" ${alerts.priceDirection !== "lte" ? "selected" : ""}>${t("alert.price.direction.gte")}</option>
+          <option value="lte" ${alerts.priceDirection === "lte" ? "selected" : ""}>${t("alert.price.direction.lte")}</option>
         </select>
       </div>
       <div class="editor-actions">
         <button type="button" class="ghost" data-action="reset-alerts" data-market="${
           stock.market
-        }" data-stock-id="${stock.id}">清空</button>
-        <button type="submit" class="save">保存</button>
+        }" data-stock-id="${stock.id}">${t("alert.clear")}</button>
+        <button type="submit" class="save">${t("alert.save")}</button>
       </div>
     </form>
   `;
@@ -622,7 +645,7 @@ function renderStockCard(stock) {
 
   return `
     <article class="stock-line" data-stock-card="${stock.id}" data-market="${stock.market}">
-      <span class="sl-grip" title="按住拖动排序" aria-hidden="true">⋮⋮</span>
+      <span class="sl-grip" title="${t("stock.dragHint")}" aria-hidden="true">⋮⋮</span>
       <div class="sl-name">
         <span class="sl-label" data-stock-name>${escapeHtml(stock.name)}</span>
         <span class="sl-code" data-stock-code>${escapeHtml(stock.code)}</span>
@@ -636,8 +659,8 @@ function renderStockCard(stock) {
         quote.changePercent
       )}</span>
       <div class="sl-actions">
-        <button type="button" class="icon-action-sm ${hasAlert ? "active" : ""}" data-action="toggle-alert-editor" data-stock-id="${stock.id}" title="提醒" aria-label="提醒">🔔</button>
-        <button type="button" class="icon-action-sm danger" data-action="delete-stock" data-market="${stock.market}" data-stock-id="${stock.id}" title="删除" aria-label="删除">✕</button>
+        <button type="button" class="icon-action-sm ${hasAlert ? "active" : ""}" data-action="toggle-alert-editor" data-stock-id="${stock.id}" title="${t("stock.alert")}" aria-label="${t("stock.alert")}">🔔</button>
+        <button type="button" class="icon-action-sm danger" data-action="delete-stock" data-market="${stock.market}" data-stock-id="${stock.id}" title="${t("stock.remove")}" aria-label="${t("stock.remove")}">✕</button>
       </div>
     </article>
     ${renderAlertEditor(stock)}
@@ -662,7 +685,7 @@ function renderMarketColumn(market) {
             data-search-input="${market}"
             data-market="${market}"
             value="${escapeHtml(uiState.search[market])}"
-            placeholder="${meta.hint}"
+            placeholder="${t(meta.hintKey)}"
           />
           <span
             class="search-status ${statusClass}"
@@ -677,7 +700,7 @@ function renderMarketColumn(market) {
           ${
             stocks.length
               ? stocks.map((stock) => renderStockCard(stock)).join("")
-              : `<div class="empty">搜索添加股票</div>`
+              : `<div class="empty">${t("search.empty")}</div>`
           }
         </div>
       </div>
@@ -870,7 +893,7 @@ function sendMessage(message) {
       }
 
       if (response?.ok === false) {
-        reject(new Error(response.error || "请求失败"));
+        reject(new Error(response.error || t("error.requestFailed")));
         return;
       }
 
@@ -889,7 +912,7 @@ async function manualRefresh(reason) {
       reason
     });
   } catch (error) {
-    uiState.errorMessage = error.message || "刷新失败";
+    uiState.errorMessage = error.message || t("error.refreshFailed");
     render();
   }
 }
@@ -898,7 +921,7 @@ async function addStockCandidate(stock) {
   const { added } = await upsertWatchlistStock(stock);
   uiState.search[stock.market] = "";
   resetSearchState(stock.market);
-  uiState.errorMessage = added ? "" : "股票已存在，无需重复添加。";
+  uiState.errorMessage = added ? "" : t("error.stockExists");
   await refreshState();
 
   if (added) {
@@ -1088,6 +1111,7 @@ app.addEventListener("click", async (event) => {
     if (nextMarket && MARKETS.includes(nextMarket) && nextMarket !== uiState.activeMarket) {
       captureActiveMarketScroll();
       uiState.activeMarket = nextMarket;
+      saveUiState(uiState);
       render();
     }
     return;
@@ -1120,6 +1144,15 @@ app.addEventListener("click", async (event) => {
 
   if (action === "reset-alerts") {
     await resetAlerts(target);
+  }
+
+  if (action === "set-lang") {
+    const lang = target.dataset.lang;
+    if (lang && (lang === "zh" || lang === "en") && lang !== getLang()) {
+      await setLang(lang);
+      render();
+    }
+    return;
   }
 });
 

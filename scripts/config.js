@@ -2,25 +2,25 @@ export const MARKETS = ["a", "hk", "us"];
 
 export const MARKET_META = {
   a: {
-    title: "A股",
-    subtitle: "沪深代码 / 中文名 / 拼音",
-    hint: "例如 600519、茅台、gzmt",
+    titleKey: "market.a",
+    subtitleKey: "search.a.subtitle",
+    hintKey: "search.a.hint",
     badge: "🇨🇳",
     accent: "#d65d34",
     currency: "CNY"
   },
   hk: {
-    title: "港股",
-    subtitle: "港股代码 / 中文名 / 拼音",
-    hint: "例如 00700、腾讯、txkg",
+    titleKey: "market.hk",
+    subtitleKey: "search.hk.subtitle",
+    hintKey: "search.hk.hint",
     badge: "🇭🇰",
     accent: "#0f8057",
     currency: "HKD"
   },
   us: {
-    title: "美股",
-    subtitle: "股票代码 / 英文名",
-    hint: "例如 AAPL、Apple、NVDA",
+    titleKey: "market.us",
+    subtitleKey: "search.us.subtitle",
+    hintKey: "search.us.hint",
     badge: "🇺🇸",
     accent: "#1d6bd6",
     currency: "USD"
@@ -32,7 +32,8 @@ export const DEFAULT_SETTINGS = Object.freeze({
   refreshIntervalSeconds: 30,
   alertsEnabled: true,
   changeAlertEnabled: true,
-  priceAlertEnabled: true
+  priceAlertEnabled: true,
+  language: "zh"
 });
 
 export const DEFAULT_ALERTS = Object.freeze({
@@ -68,4 +69,4 @@ export const DEFAULT_META = Object.freeze({
   marketStatus: createEmptyMarketStatus()
 });
 
-export const STORAGE_KEYS = ["watchlist", "quotes", "settings", "alertState", "meta"];
+export const STORAGE_KEYS = ["watchlist", "quotes", "settings", "alertState", "meta", "uiState"];
