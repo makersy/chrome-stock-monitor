@@ -19,10 +19,10 @@
 
 ## 快速安装（推荐）
 
-1. 从 [Releases](https://github.com/makersy/chrome-stock-monitor/releases) 下载最新 `.crx` 文件
+1. 从 [Releases](https://github.com/makersy/chrome-stock-monitor/releases) 下载最新 `.zip` 文件并解压
 2. 打开 Chrome，地址栏输入 `chrome://extensions/`
 3. 开启右上角「开发者模式」
-4. 将 `.crx` 文件拖入浏览器即可安装
+4. 点击「加载已解压的扩展程序」，选择解压后的文件夹
 
 ## 安装
 
