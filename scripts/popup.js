@@ -1316,8 +1316,26 @@ app.addEventListener(
   true
 );
 
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "hidden") {
+    captureActiveMarketScroll();
+    saveUiState(uiState);
+  }
+});
+
 async function boot() {
+  await initI18n();
+
+  const savedUi = await getUiState();
+  if (savedUi.activeMarket && MARKETS.includes(savedUi.activeMarket)) {
+    uiState.activeMarket = savedUi.activeMarket;
+  }
+  if (savedUi.marketScroll) {
+    uiState.marketScroll = savedUi.marketScroll;
+  }
+
   await refreshState();
+  restoreActiveMarketScroll();
 
   const hasItems = MARKETS.some((market) => (state.watchlist[market] || []).length > 0);
   const shouldRefresh = hasItems && !state.meta.lastRefreshAt;
