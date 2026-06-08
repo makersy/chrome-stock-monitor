@@ -126,7 +126,8 @@ export async function ensureStorageState() {
     quotes: normalizeRecord(current.quotes),
     settings: normalizeSettings(current.settings),
     alertState: normalizeRecord(current.alertState),
-    meta: normalizeMeta(current.meta)
+    meta: normalizeMeta(current.meta),
+    indexQuotes: normalizeRecord(current.indexQuotes)
   };
 
   const currentSnapshot = JSON.stringify({
@@ -134,7 +135,8 @@ export async function ensureStorageState() {
     quotes: current.quotes || {},
     settings: current.settings || DEFAULT_SETTINGS,
     alertState: current.alertState || {},
-    meta: current.meta || DEFAULT_META
+    meta: current.meta || DEFAULT_META,
+    indexQuotes: current.indexQuotes || {}
   });
   const nextSnapshot = JSON.stringify(next);
 

@@ -254,7 +254,8 @@ async function refreshQuotesInternal(reason = "manual") {
   const payload = {
     quotes: nextQuotes,
     meta: nextMeta,
-    alertState
+    alertState,
+    indexQuotes: result.indexQuotes || {}
   };
 
   if (hasWatchlistUpdates) {

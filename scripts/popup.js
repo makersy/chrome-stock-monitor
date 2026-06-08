@@ -1,4 +1,4 @@
-import { MARKET_META, MARKETS, STORAGE_KEYS } from "./config.js";
+import { MARKET_META, MARKETS, MARKET_INDICES, STORAGE_KEYS } from "./config.js";
 import { initI18n, t, getLang, setLang } from "./i18n.js";
 import { searchMarketSuggestions, shouldUseRemoteSearch } from "./data/search-provider.js";
 import {
@@ -81,6 +81,14 @@ function escapeHtml(value) {
 }
 
 function formatCurrency(_market, value) {
+  if (!Number.isFinite(Number(value))) {
+    return "--";
+  }
+
+  return Number(value).toFixed(2);
+}
+
+function formatIndexPrice(value) {
   if (!Number.isFinite(Number(value))) {
     return "--";
   }
@@ -459,10 +467,51 @@ function renderMarketTabs() {
   `;
 }
 
+function renderIndexInfo(market) {
+  const indices = MARKET_INDICES[market] || [];
+  if (!indices.length) {
+    return "";
+  }
+
+  const quotes = state.indexQuotes || {};
+
+  const items = indices.map((idx) => {
+    const q = quotes[idx.symbol];
+    if (!q || q.error) {
+      return `
+        <span class="index-item">
+          <span class="idx-name">${t(idx.nameKey)}</span>
+          <span class="idx-nums">
+            <span class="idx-price flat idx-placeholder">${q?.error ? "!" : "--"}</span>
+          </span>
+        </span>
+      `;
+    }
+
+    const cls = getPriceClass(q.changePercent);
+    return `
+      <span class="index-item">
+        <span class="idx-name">${t(idx.nameKey)}</span>
+        <span class="idx-nums">
+          <span class="idx-price ${cls}" data-idx-price="${idx.symbol}">${formatIndexPrice(q.price)}</span>
+          <span class="idx-change ${cls}" data-idx-change="${idx.symbol}">${formatPercent(q.changePercent)}</span>
+        </span>
+      </span>
+    `;
+  });
+
+  return `
+    <span class="index-group">
+      ${items.join('<span class="index-divider"></span>')}
+    </span>
+  `;
+}
+
 function renderControlRow() {
   return `
     <section class="control-row">
       ${renderMarketTabs()}
+      ${renderIndexInfo(uiState.activeMarket)}
       <button
         type="button"
         class="market-tab settings-btn"
@@ -843,6 +892,45 @@ function patchMarketTabs() {
   });
 }
 
+function patchIndexInfo() {
+  const market = uiState.activeMarket;
+  const indices = MARKET_INDICES[market] || [];
+  if (!indices.length) {
+    return;
+  }
+
+  const quotes = state.indexQuotes || {};
+
+  indices.forEach((idx) => {
+    const q = quotes[idx.symbol];
+    const priceEl = app.querySelector(`[data-idx-price="${idx.symbol}"]`);
+    const changeEl = app.querySelector(`[data-idx-change="${idx.symbol}"]`);
+
+    if (!q || q.error) {
+      if (priceEl instanceof HTMLElement) {
+        priceEl.textContent = q?.error ? "!" : "--";
+        priceEl.className = "idx-price flat idx-placeholder";
+      }
+      if (changeEl instanceof HTMLElement) {
+        changeEl.textContent = "";
+      }
+      return;
+    }
+
+    const cls = getPriceClass(q.changePercent);
+
+    if (priceEl instanceof HTMLElement) {
+      priceEl.textContent = formatIndexPrice(q.price);
+      priceEl.className = `idx-price ${cls}`;
+    }
+
+    if (changeEl instanceof HTMLElement) {
+      changeEl.textContent = formatPercent(q.changePercent);
+      changeEl.className = `idx-change ${cls}`;
+    }
+  });
+}
+
 function patchQuoteRelatedView() {
   if (!state || uiState.settingsOpen || isDragSortBusy()) {
     return;
@@ -851,6 +939,7 @@ function patchQuoteRelatedView() {
   patchMarketTabs();
   MARKETS.forEach((market) => patchMarketStatus(market));
   patchVisibleStockCards();
+  patchIndexInfo();
 }
 
 function getAlertSignature(alerts = {}) {

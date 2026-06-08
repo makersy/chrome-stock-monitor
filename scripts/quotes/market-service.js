@@ -1,4 +1,4 @@
-import { MARKETS } from "../config.js";
+import { MARKETS, MARKET_INDICES } from "../config.js";
 
 function toNumber(value) {
   const parsed = Number(value);
@@ -133,12 +133,96 @@ export async function fetchMarketQuotes(_market, stocks) {
   return results;
 }
 
+function parseIndexQuoteLine(line) {
+  const match = line.match(/v_([^=]+)="([^"]*)"/);
+  if (!match) {
+    return null;
+  }
+
+  const symbol = match[1];
+  const payload = match[2];
+
+  if (!payload || payload === "pv_none_match") {
+    return { symbol, error: "未匹配到行情" };
+  }
+
+  const fields = payload.split("~");
+  if (fields.length < 6) {
+    return { symbol, error: "行情格式异常" };
+  }
+
+  const name = fields[1] || symbol;
+  const price = toNumber(fields[3]);
+  if (price === null) {
+    return { symbol, error: "行情数据缺失" };
+  }
+
+  let change;
+  let changePercent;
+
+  // Long format (HK, US): date-like field at index 30, change at 31, change% at 32
+  if (fields.length > 32 && /^\d{4}[-/]\d{2}[-/]\d{2}/.test(fields[30])) {
+    change = toNumber(fields[31]);
+    changePercent = toNumber(fields[32]);
+  } else {
+    // Short format (A-share): change at [4], change% at [5]
+    change = toNumber(fields[4]);
+    changePercent = toNumber(fields[5]);
+  }
+
+  if (change === null || changePercent === null) {
+    return { symbol, name, price, error: "涨跌幅缺失" };
+  }
+
+  return { symbol, name, price, change, changePercent };
+}
+
+export async function fetchIndexQuotes() {
+  const allSymbols = [];
+  MARKETS.forEach((market) => {
+    const indices = MARKET_INDICES[market] || [];
+    indices.forEach((idx) => allSymbols.push(idx.symbol));
+  });
+
+  if (!allSymbols.length) {
+    return {};
+  }
+
+  const url = `https://qt.gtimg.cn/q=${allSymbols.join(",")}`;
+  const response = await fetch(url, {
+    method: "GET",
+    cache: "no-store"
+  });
+
+  if (!response.ok) {
+    throw new Error(`指数接口返回 ${response.status}`);
+  }
+
+  const buffer = await response.arrayBuffer();
+  const text = decodeQuoteResponse(buffer);
+
+  const result = {};
+  text
+    .split(";")
+    .map((l) => l.trim())
+    .filter(Boolean)
+    .forEach((l) => {
+      const parsed = parseIndexQuoteLine(l);
+      if (parsed) {
+        result[parsed.symbol] = parsed;
+      }
+    });
+
+  return result;
+}
+
 export async function fetchQuotesForWatchlist(watchlist) {
   const quotes = {};
   const marketStatus = {};
   const watchlistUpdates = {};
   const stocksByMarket = {};
   const allStocks = [];
+  let indexQuotes = {};
 
   MARKETS.forEach((market) => {
     const stocks = watchlist[market] || [];
@@ -157,10 +241,16 @@ export async function fetchQuotesForWatchlist(watchlist) {
   });
 
   if (!allStocks.length) {
+    try {
+      indexQuotes = await fetchIndexQuotes();
+    } catch (_error) {
+      // Index fetch failure is non-blocking
+    }
     return {
       quotes,
       marketStatus,
-      watchlistUpdates
+      watchlistUpdates,
+      indexQuotes
     };
   }
 
@@ -235,9 +325,16 @@ export async function fetchQuotesForWatchlist(watchlist) {
     });
   }
 
+  try {
+    indexQuotes = await fetchIndexQuotes();
+  } catch (_error) {
+    // Index fetch failure is non-blocking
+  }
+
   return {
     quotes,
     marketStatus,
-    watchlistUpdates
+    watchlistUpdates,
+    indexQuotes
   };
 }

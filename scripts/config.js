@@ -64,9 +64,24 @@ export function createEmptyMarketStatus() {
   };
 }
 
+export const MARKET_INDICES = {
+  a: [
+    { symbol: "s_sh000001", nameKey: "index.sh" },
+    { symbol: "s_sz399001", nameKey: "index.sz" }
+  ],
+  hk: [
+    { symbol: "r_hkHSI", nameKey: "index.hsi" },
+    { symbol: "r_hkHSTECH", nameKey: "index.hstech" }
+  ],
+  us: [
+    { symbol: "usINX", nameKey: "index.spx" },
+    { symbol: "usIXIC", nameKey: "index.ixic" }
+  ]
+};
+
 export const DEFAULT_META = Object.freeze({
   lastRefreshAt: null,
   marketStatus: createEmptyMarketStatus()
 });
 
-export const STORAGE_KEYS = ["watchlist", "quotes", "settings", "alertState", "meta", "uiState"];
+export const STORAGE_KEYS = ["watchlist", "quotes", "settings", "alertState", "meta", "indexQuotes", "uiState"];

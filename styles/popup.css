@@ -54,12 +54,13 @@ input, select { color: var(--ink); }
 
 /* ── Control Row ── */
 .control-row {
-  display: flex; align-items: center; justify-content: space-between; gap: 6px;
+  display: flex; align-items: center; gap: 0;
 }
 
 /* ── Market Tabs ── */
 .market-tabs {
   display: flex; gap: 6px;
+  flex: 0 0 auto;
 }
 
 .market-tab {
@@ -92,7 +93,67 @@ input, select { color: var(--ink); }
   color: #fff;
 }
 
-.settings-btn { font-size: 17px; padding: 8px 12px; }
+.settings-btn {
+  font-size: 17px; padding: 8px 12px;
+  flex: 0 0 auto;
+  margin-left: 8px;
+}
+
+/* ── Market Index Info ── */
+.index-group {
+  flex: 1;
+  display: flex; align-items: center; justify-content: flex-end;
+  gap: 0;
+  margin-right: 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+.index-item {
+  display: flex; align-items: center; gap: 3px;
+}
+
+.idx-nums {
+  display: flex; flex-direction: column;
+  align-items: flex-end; gap: 1px;
+}
+
+.idx-name {
+  font-size: 11px; color: var(--ink);
+  font-weight: 600; line-height: 1;
+}
+
+.idx-price {
+  font-size: 11px; font-weight: 700; line-height: 1.2;
+}
+
+.idx-change {
+  font-size: 10px; font-weight: 600; line-height: 1;
+  padding: 1px 4px; border-radius: 3px;
+}
+
+.idx-price.up,   .idx-change.up   { color: var(--up); }
+.idx-price.down, .idx-change.down { color: var(--down); }
+.idx-price.flat, .idx-change.flat { color: var(--flat); }
+
+.idx-change.up   { background: rgba(208,59,46,0.10); }
+.idx-change.down { background: rgba(10,139,92,0.10); }
+.idx-change.flat { background: rgba(122,132,149,0.08); }
+
+.index-divider {
+  width: 1px;
+  background: var(--line);
+  margin: 0 7px;
+  flex: 0 0 auto;
+  align-self: stretch;
+}
+
+.idx-placeholder {
+  color: var(--ink-soft);
+}
+.idx-error {
+  color: var(--danger);
+  font-weight: 700;
+}
 
 /* ── Settings Page ── */
 .page-header {

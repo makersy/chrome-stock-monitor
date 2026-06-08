@@ -46,7 +46,13 @@ const messages = {
     "error.requestFailed": "请求失败",
     "error.stockExists": "股票已存在，无需重复添加。",
     "lang.zh": "中文",
-    "lang.en": "English"
+    "lang.en": "English",
+    "index.sh": "上证",
+    "index.sz": "深成",
+    "index.hsi": "恒生",
+    "index.hstech": "科指",
+    "index.spx": "标普",
+    "index.ixic": "纳指"
   },
   en: {
     "market.a": "A-Share",
@@ -95,7 +101,13 @@ const messages = {
     "error.requestFailed": "Request failed",
     "error.stockExists": "Stock already exists.",
     "lang.zh": "中文",
-    "lang.en": "English"
+    "lang.en": "English",
+    "index.sh": "SH",
+    "index.sz": "SZ",
+    "index.hsi": "HSI",
+    "index.hstech": "TECH",
+    "index.spx": "SPX",
+    "index.ixic": "IXIC"
   }
 };
 
