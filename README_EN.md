@@ -10,12 +10,14 @@ No signup, no backend — install and go.
 
 - **Three Markets**: A-Share, HK, and US stocks in separate tabs
 - **Real-Time Quotes**: Live price, change, and % change with red/green coloring
-- **Smart Search**: Search by code, name, or pinyin. A-Share and HK use full-market remote search
+- **Smart Search**: Search by code, name, or pinyin — full-market search including BSE and ETFs
 - **Auto Refresh**: Runs in the background with configurable 1–30 second intervals
 - **Change Alerts**: Set a % threshold — get notified when exceeded
 - **Price Alerts**: Set a target price with direction (≥ / ≤) — get notified on hit
 - **Badge Alerts**: Triggered stock count shown directly on the extension icon
-- **Drag & Drop Reorder**: Long-press the grip handle on the left of a stock card to drag and reorder
+- **Drag & Drop Reorder**: Hold the stock name area to drag and reorder
+- **Pin Stocks**: 📌 button to pin important stocks to the top
+- **Bilingual**: HK/US stock names switch to English automatically in English mode
 
 ## Install
 
@@ -35,7 +37,7 @@ git clone https://github.com/makersy/chrome-stock-monitor.git
 3. Search by stock code or name, then click to add
 4. Tap 🔔 to set a change threshold or target price
 5. Tap ⚙ to open settings and configure auto-refresh and alerts
-6. Long-press the ⋮⋮ grip handle on any stock card to drag and reorder
+6. Hold the stock name area to drag and reorder
 
 ## Data Sources
 
@@ -43,7 +45,11 @@ Quote data comes from Tencent quote APIs and Eastmoney search APIs — all publi
 
 ## Screenshots
 
-> TBD
+![Main](screenshots/main.png)
+
+![Search](screenshots/search.png)
+
+![English Mode](screenshots/search_en.png)
 
 ## License
 
