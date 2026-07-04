@@ -183,7 +183,15 @@ export async function upsertWatchlistStock(stock) {
   const exists = nextWatchlist[item.market].some((entry) => entry.id === item.id);
 
   if (!exists) {
-    nextWatchlist[item.market] = [item, ...nextWatchlist[item.market]];
+    // 找到最后一个置顶股票的位置，插入到其后面
+    const list = nextWatchlist[item.market];
+    let insertIndex = 0;
+    for (let i = 0; i < list.length; i++) {
+      if (list[i].isPinned) {
+        insertIndex = i + 1;
+      }
+    }
+    list.splice(insertIndex, 0, item);
     await chrome.storage.local.set({ watchlist: nextWatchlist });
   }
 
