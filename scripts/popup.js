@@ -710,7 +710,8 @@ function renderStockCard(stock) {
   const badges = renderStockBadges(quote, alertState);
   const isPinned = Boolean(stock.isPinned);
   const lang = getLang();
-  const displayName = lang === "en" && stock.nameEn ? stock.nameEn : stock.name;
+  const nameEn = quote.nameEn || stock.nameEn || "";
+  const displayName = lang === "en" && nameEn ? nameEn : stock.name;
 
   return `
     <article class="stock-line ${isPinned ? "pinned" : ""}" data-stock-card="${stock.id}" data-market="${stock.market}">
