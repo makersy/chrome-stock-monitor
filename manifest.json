@@ -17,6 +17,7 @@
   ],
   "host_permissions": [
     "https://qt.gtimg.cn/*",
-    "https://smartbox.gtimg.cn/*"
+    "https://smartbox.gtimg.cn/*",
+    "https://searchapi.eastmoney.com/*"
   ]
 }

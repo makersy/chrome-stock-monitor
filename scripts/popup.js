@@ -9,7 +9,8 @@ import {
   saveUiState,
   updateSettings,
   updateStockAlerts,
-  upsertWatchlistStock
+  upsertWatchlistStock,
+  toggleStockPinned
 } from "./storage.js";
 
 const app = document.querySelector("#app");
@@ -625,6 +626,22 @@ function renderSuggestions(market) {
       ${suggestions
         .map((stock) => {
           const label = stock.label || stock.name;
+          if (stock.isAdded) {
+            return `
+              <div
+                class="suggestion added"
+                title="${escapeHtml(label)} 已在自选中"
+              >
+                <div class="suggestion-copy">
+                  <div class="suggestion-name">${escapeHtml(label)}</div>
+                  <div class="suggestion-meta">${escapeHtml(stock.code)} · ${escapeHtml(
+                    stock.symbol
+                  )}</div>
+                </div>
+                <span class="suggestion-added-icon">✓</span>
+              </div>
+            `;
+          }
           return `
             <button
               class="suggestion"
@@ -691,12 +708,13 @@ function renderStockCard(stock) {
   const priceClass = getPriceClass(quote.changePercent);
   const hasAlert = Boolean(stock.alerts.changeThreshold || stock.alerts.priceTarget);
   const badges = renderStockBadges(quote, alertState);
+  const isPinned = Boolean(stock.isPinned);
 
   return `
-    <article class="stock-line" data-stock-card="${stock.id}" data-market="${stock.market}">
-      <span class="sl-grip" title="${t("stock.dragHint")}" aria-hidden="true">⋮⋮</span>
-      <div class="sl-name">
-        <span class="sl-label" data-stock-name>${escapeHtml(stock.name)}</span>
+    <article class="stock-line ${isPinned ? "pinned" : ""}" data-stock-card="${stock.id}" data-market="${stock.market}">
+      <button type="button" class="sl-pin ${isPinned ? "active" : ""}" data-action="toggle-pin" data-market="${stock.market}" data-stock-id="${stock.id}" title="${isPinned ? "取消置顶" : "置顶"}" aria-label="${isPinned ? "取消置顶" : "置顶"}">📌</button>
+      <div class="sl-name" title="按住拖动排序">
+        <span class="sl-label" data-stock-name title="${escapeHtml(stock.name)}">${escapeHtml(stock.name)}</span>
         <span class="sl-code" data-stock-code>${escapeHtml(stock.code)}</span>
         <span class="sl-badges" data-stock-badges>${badges}</span>
       </div>
@@ -1034,6 +1052,11 @@ async function handleDeleteStock(button) {
   await sendMessage({ type: "SYNC_BADGE" });
 }
 
+async function handleTogglePin(button) {
+  await toggleStockPinned(button.dataset.market, button.dataset.stockId);
+  await refreshState();
+}
+
 async function handleSettingChange(target) {
   const key = target.dataset.settingKey;
   let value = target.type === "checkbox" ? target.checked : Number(target.value || "1");
@@ -1086,8 +1109,8 @@ app.addEventListener("pointerdown", (event) => {
     return;
   }
 
-  const grip = target.closest(".sl-grip");
-  if (!(grip instanceof HTMLElement)) {
+  const nameArea = target.closest(".sl-name");
+  if (!(nameArea instanceof HTMLElement)) {
     return;
   }
 
@@ -1095,7 +1118,7 @@ app.addEventListener("pointerdown", (event) => {
     return;
   }
 
-  const lineEl = grip.closest(".stock-line");
+  const lineEl = nameArea.closest(".stock-line");
   if (!(lineEl instanceof HTMLElement)) {
     return;
   }
@@ -1211,6 +1234,11 @@ app.addEventListener("click", async (event) => {
 
   if (action === "delete-stock") {
     await handleDeleteStock(target);
+    return;
+  }
+
+  if (action === "toggle-pin") {
+    await handleTogglePin(target);
     return;
   }
 

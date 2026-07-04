@@ -51,6 +51,7 @@ export function prepareStockRecord(stock) {
     code: String(stock.code || "").trim().toUpperCase(),
     name: decodeEscapedText(stock.name || stock.code || "").trim(),
     isCustom: Boolean(stock.isCustom),
+    isPinned: Boolean(stock.isPinned),
     alerts: normalizeAlerts(stock.alerts || DEFAULT_ALERTS)
   };
 }
@@ -290,6 +291,33 @@ export async function updateStockAlerts(market, stockId, alerts) {
     watchlist: nextWatchlist,
     alertState: nextAlertState
   });
+}
+
+export async function toggleStockPinned(market, stockId) {
+  const state = await getStorageState();
+  const nextWatchlist = normalizeWatchlist(state.watchlist);
+  let isPinned = false;
+  
+  nextWatchlist[market] = nextWatchlist[market].map((stock) => {
+    if (stock.id !== stockId) {
+      return stock;
+    }
+    isPinned = !stock.isPinned;
+    return {
+      ...stock,
+      isPinned
+    };
+  });
+
+  // Sort: pinned stocks first, then by original order
+  nextWatchlist[market].sort((a, b) => {
+    if (a.isPinned && !b.isPinned) return -1;
+    if (!a.isPinned && b.isPinned) return 1;
+    return 0;
+  });
+
+  await chrome.storage.local.set({ watchlist: nextWatchlist });
+  return isPinned;
 }
 
 export async function getUiState() {

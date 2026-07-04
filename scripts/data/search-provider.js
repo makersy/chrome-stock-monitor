@@ -1,12 +1,6 @@
 const SEARCH_ENDPOINT = "https://smartbox.gtimg.cn/s3/";
 const EASTMONEY_SEARCH_ENDPOINT = "https://searchapi.eastmoney.com/api/suggest/get";
 const EASTMONEY_TOKEN = "D43BF722C8E33BDC906FB84D85E326E8";
-const SEARCH_CACHE_KEY = "searchCache";
-const SEARCH_CACHE_TTL_MS = 1000 * 60 * 60 * 24 * 7;
-const SEARCH_CACHE_LIMIT = 180;
-
-const memoryCache = new Map();
-let storageCachePromise = null;
 
 function normalizeQuery(query) {
   return String(query || "")
@@ -159,10 +153,26 @@ function mapEastmoneyRecord(record) {
   if (
     ["0", "1", "2", "90"].includes(marketType) ||
     classify === "ashares" ||
-    securityTypeName.includes("A股")
+    classify === "neeq" ||
+    marketType === "_TB" ||
+    securityTypeName.includes("A股") ||
+    securityTypeName.includes("京A") ||
+    securityTypeName.includes("ETF") ||
+    securityTypeName.includes("LOF") ||
+    securityTypeName.includes("基金")
   ) {
     if (!/^\d{6}$/.test(code)) {
       return null;
+    }
+
+    // 强制北交所
+    if (classify === "neeq" || marketType === "_TB" || securityTypeName.includes("京A")) {
+      return {
+        market: "a",
+        symbol: `bj${code}`,
+        code,
+        name
+      };
     }
 
     const prefix =
@@ -189,7 +199,7 @@ function mapEastmoneyRecord(record) {
 
 function isSupportedType(type) {
   const normalized = String(type || "").trim().toUpperCase();
-  return !normalized || normalized.startsWith("GP");
+  return !normalized || normalized.startsWith("GP") || normalized.startsWith("ETF") || normalized === "LOF" || normalized === "FUND";
 }
 
 function dedupeSuggestions(items, existingIds = new Set(), limit = 8) {
@@ -201,17 +211,19 @@ function dedupeSuggestions(items, existingIds = new Set(), limit = 8) {
     }
 
     const id = `${item.market}:${item.symbol}`;
-    if (existingIds.has(id) || map.has(item.symbol)) {
+    if (map.has(item.symbol)) {
       return;
     }
 
+    const isAdded = existingIds.has(id);
     map.set(item.symbol, {
       market: item.market,
       symbol: item.symbol,
       code: item.code,
       name: normalizeRemoteName(item.name),
       label: item.label ? normalizeRemoteName(item.label) : "",
-      isCustom: Boolean(item.isCustom)
+      isCustom: Boolean(item.isCustom),
+      isAdded
     });
   });
 
@@ -266,76 +278,6 @@ export function parseEastmoneySuggestionResponse(payload, preferredMarket = "") 
   );
 }
 
-function getCacheEntryKey(market, query) {
-  return `${market}:${normalizeQuery(query)}`;
-}
-
-function pruneCacheEntries(cache) {
-  const entries = Object.entries(cache || {}).sort(
-    (left, right) => (right[1]?.fetchedAt || 0) - (left[1]?.fetchedAt || 0)
-  );
-
-  return Object.fromEntries(entries.slice(0, SEARCH_CACHE_LIMIT));
-}
-
-async function loadStorageCache() {
-  if (!storageCachePromise) {
-    storageCachePromise = chrome.storage.local
-      .get(SEARCH_CACHE_KEY)
-      .then((record) => pruneCacheEntries(record?.[SEARCH_CACHE_KEY] || {}));
-  }
-
-  return storageCachePromise;
-}
-
-async function writeStorageCache(cache) {
-  const next = pruneCacheEntries(cache);
-  storageCachePromise = Promise.resolve(next);
-  await chrome.storage.local.set({ [SEARCH_CACHE_KEY]: next });
-}
-
-async function readCachedSuggestions(market, query) {
-  const key = getCacheEntryKey(market, query);
-  const now = Date.now();
-
-  if (memoryCache.has(key)) {
-    const cached = memoryCache.get(key);
-    if (now - cached.fetchedAt <= SEARCH_CACHE_TTL_MS) {
-      return cached.items;
-    }
-    memoryCache.delete(key);
-  }
-
-  const storageCache = await loadStorageCache();
-  const cached = storageCache[key];
-  if (!cached) {
-    return null;
-  }
-
-  memoryCache.set(key, cached);
-
-  if (now - cached.fetchedAt > SEARCH_CACHE_TTL_MS) {
-    return null;
-  }
-
-  return cached.items;
-}
-
-async function persistCachedSuggestions(market, query, items) {
-  const key = getCacheEntryKey(market, query);
-  const entry = {
-    fetchedAt: Date.now(),
-    items: dedupeSuggestions(items)
-  };
-
-  memoryCache.set(key, entry);
-  const storageCache = await loadStorageCache();
-  await writeStorageCache({
-    ...storageCache,
-    [key]: entry
-  });
-}
-
 export function shouldUseRemoteSearch(market, query) {
   return ["a", "hk", "us"].includes(market) && Boolean(normalizeQuery(query));
 }
@@ -379,14 +321,6 @@ export async function searchMarketSuggestions(market, query, existingIds = new S
     };
   }
 
-  const cached = await readCachedSuggestions(market, query);
-  if (cached?.length) {
-    return {
-      items: dedupeSuggestions([...cached, ...mergedFallback], existingIds, limit),
-      source: "cache"
-    };
-  }
-
   try {
     const [tencentItems, eastmoneyItems] = await Promise.allSettled([
       fetchRemoteSuggestions(market, query),
@@ -397,10 +331,6 @@ export async function searchMarketSuggestions(market, query, existingIds = new S
       ...(eastmoneyItems.status === "fulfilled" ? eastmoneyItems.value : []),
       ...(tencentItems.status === "fulfilled" ? tencentItems.value : [])
     ];
-
-    if (remoteItems.length) {
-      await persistCachedSuggestions(market, query, remoteItems);
-    }
 
     return {
       items: dedupeSuggestions([...remoteItems, ...mergedFallback], existingIds, limit),
