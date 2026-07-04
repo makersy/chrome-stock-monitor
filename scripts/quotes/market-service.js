@@ -55,7 +55,8 @@ function parseQuoteLine(line) {
   }
 
   const name = fields[1] || symbol;
-  const nameEn = fields[46] || ""; // 英文名称在第47个字段
+  const rawNameEn = fields[46] || "";
+  const nameEn = rawNameEn && /[a-zA-Z]/.test(rawNameEn) ? rawNameEn : ""; // 过滤掉纯数字/中文
   const code = fields[2] || symbol.replace(/^(sh|sz|hk|us)/i, "");
   const price = toNumber(fields[3]);
   const prevClose = toNumber(fields[4]);
@@ -292,10 +293,10 @@ export async function fetchQuotesForWatchlist(watchlist) {
         };
 
         // 更新名称或英文名称
-        if (quote.name && (quote.name !== stock.name || (quote.nameEn && quote.nameEn !== stock.nameEn))) {
+        if (quote.name && (quote.name !== stock.name || quote.nameEn !== stock.nameEn)) {
           watchlistUpdates[stock.id] = {
             name: quote.name,
-            nameEn: quote.nameEn || stock.nameEn || "",
+            nameEn: quote.nameEn || "",
             code: quote.code || stock.code,
             isCustom: false
           };
