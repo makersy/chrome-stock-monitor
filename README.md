@@ -50,7 +50,9 @@ git clone https://github.com/makersy/chrome-stock-monitor.git
 
 ## 截图
 
-> 待补充
+![主界面](screenshots/main.png)
+
+![搜索](screenshots/search.png)
 
 ## License
 
