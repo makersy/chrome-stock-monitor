@@ -861,7 +861,11 @@ function patchVisibleStockCards() {
 
     const nameEl = card.querySelector("[data-stock-name]");
     if (nameEl instanceof HTMLElement) {
-      nameEl.textContent = stock.name;
+      const lang = getLang();
+      const nameEn = quote.nameEn || stock.nameEn || "";
+      const displayName = lang === "en" && nameEn ? nameEn : stock.name;
+      nameEl.textContent = displayName;
+      nameEl.title = displayName;
     }
 
     const codeEl = card.querySelector("[data-stock-code]");
