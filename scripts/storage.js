@@ -50,6 +50,7 @@ export function prepareStockRecord(stock) {
     symbol: String(stock.symbol || "").trim(),
     code: String(stock.code || "").trim().toUpperCase(),
     name: decodeEscapedText(stock.name || stock.code || "").trim(),
+    nameEn: String(stock.nameEn || "").trim(),
     isCustom: Boolean(stock.isCustom),
     isPinned: Boolean(stock.isPinned),
     alerts: normalizeAlerts(stock.alerts || DEFAULT_ALERTS)

@@ -709,12 +709,14 @@ function renderStockCard(stock) {
   const hasAlert = Boolean(stock.alerts.changeThreshold || stock.alerts.priceTarget);
   const badges = renderStockBadges(quote, alertState);
   const isPinned = Boolean(stock.isPinned);
+  const lang = getLang();
+  const displayName = lang === "en" && stock.nameEn ? stock.nameEn : stock.name;
 
   return `
     <article class="stock-line ${isPinned ? "pinned" : ""}" data-stock-card="${stock.id}" data-market="${stock.market}">
       <button type="button" class="sl-pin ${isPinned ? "active" : ""}" data-action="toggle-pin" data-market="${stock.market}" data-stock-id="${stock.id}" title="${isPinned ? "取消置顶" : "置顶"}" aria-label="${isPinned ? "取消置顶" : "置顶"}">📌</button>
       <div class="sl-name" title="按住拖动排序">
-        <span class="sl-label" data-stock-name title="${escapeHtml(stock.name)}">${escapeHtml(stock.name)}</span>
+        <span class="sl-label" data-stock-name title="${escapeHtml(displayName)}">${escapeHtml(displayName)}</span>
         <span class="sl-code" data-stock-code>${escapeHtml(stock.code)}</span>
         <span class="sl-badges" data-stock-badges>${badges}</span>
       </div>

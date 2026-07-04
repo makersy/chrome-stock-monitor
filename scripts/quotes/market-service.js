@@ -55,6 +55,7 @@ function parseQuoteLine(line) {
   }
 
   const name = fields[1] || symbol;
+  const nameEn = fields[46] || ""; // 英文名称在第47个字段
   const code = fields[2] || symbol.replace(/^(sh|sz|hk|us)/i, "");
   const price = toNumber(fields[3]);
   const prevClose = toNumber(fields[4]);
@@ -74,6 +75,7 @@ function parseQuoteLine(line) {
     symbol,
     quote: {
       name,
+      nameEn,
       code,
       price,
       prevClose,
@@ -292,6 +294,7 @@ export async function fetchQuotesForWatchlist(watchlist) {
         if (quote.name && quote.name !== stock.name) {
           watchlistUpdates[stock.id] = {
             name: quote.name,
+            nameEn: quote.nameEn || stock.nameEn || "",
             code: quote.code || stock.code,
             isCustom: false
           };
