@@ -291,7 +291,8 @@ export async function fetchQuotesForWatchlist(watchlist) {
           fetchedAt
         };
 
-        if (quote.name && quote.name !== stock.name) {
+        // 更新名称或英文名称
+        if (quote.name && (quote.name !== stock.name || (quote.nameEn && quote.nameEn !== stock.nameEn))) {
           watchlistUpdates[stock.id] = {
             name: quote.name,
             nameEn: quote.nameEn || stock.nameEn || "",
