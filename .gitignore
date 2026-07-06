@@ -24,4 +24,5 @@ pnpm-debug.log*
 *.pem
 *.zip
 
-.hermes*.bak
+.hermes
+*.bak
