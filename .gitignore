@@ -23,3 +23,5 @@ pnpm-debug.log*
 *.crx
 *.pem
 *.zip
+
+.hermes
