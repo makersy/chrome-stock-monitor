@@ -182,7 +182,7 @@ function parseIndexQuoteLine(line) {
 
 export async function fetchIndexQuotes() {
   const tencentSymbols = [];
-  ["a", "us"].forEach((market) => {
+  MARKETS.forEach((market) => {
     (MARKET_INDICES[market] || []).forEach((idx) => tencentSymbols.push(idx.symbol));
   });
 
@@ -213,10 +213,26 @@ export async function fetchIndexQuotes() {
     fetchEastmoneyHkIndices()
   ]);
 
-  return {
-    ...(tencentResult.status === "fulfilled" ? tencentResult.value : {}),
-    ...(hkResult.status === "fulfilled" ? hkResult.value : {})
-  };
+  const tencentData = tencentResult.status === "fulfilled" ? tencentResult.value : {};
+  const eastmoneyHkData = hkResult.status === "fulfilled" ? hkResult.value : {};
+  const eastmoneyHkFailed = hkResult.status === "rejected";
+
+  // 东财港股指数可用 → 用东财的，剔除腾讯里的港股指数
+  // 东财挂了 → 保留腾讯里的港股指数作为 fallback
+  const hkSymbols = new Set(Object.keys(EASTMONEY_HK_INDICES));
+  const result = {};
+
+  Object.entries(tencentData).forEach(([symbol, value]) => {
+    if (eastmoneyHkFailed || !hkSymbols.has(symbol)) {
+      result[symbol] = value;
+    }
+  });
+
+  if (!eastmoneyHkFailed) {
+    Object.assign(result, eastmoneyHkData);
+  }
+
+  return result;
 }
 
 const EASTMONEY_HK_QUOTE_FIELDS = "f12,f14,f2,f3,f4,f17,f18";
@@ -383,13 +399,29 @@ export async function fetchQuotesForWatchlist(watchlist) {
     tencentResult.status === "fulfilled" ? tencentResult.value : {};
   const eastmoneyQuotes =
     eastmoneyResult.status === "fulfilled" ? eastmoneyResult.value : {};
-  const tencentError =
-    tencentResult.status === "rejected"
-      ? tencentResult.reason?.message || "获取失败"
-      : "";
-  const eastmoneyError =
-    eastmoneyResult.status === "rejected"
-      ? eastmoneyResult.reason?.message || "获取失败"
+  const tencentFailed = tencentResult.status === "rejected";
+  const eastmoneyFailed = eastmoneyResult.status === "rejected";
+  const tencentError = tencentFailed
+    ? tencentResult.reason?.message || "获取失败"
+    : "";
+  const eastmoneyError = eastmoneyFailed
+    ? eastmoneyResult.reason?.message || "获取失败"
+    : "";
+
+  // 东财失败时回退到腾讯港股
+  let hkFallbackQuotes = {};
+  if (hkStocks.length && eastmoneyFailed && !tencentFailed) {
+    try {
+      hkFallbackQuotes = await fetchMarketQuotes("all", hkStocks);
+    } catch (_error) {
+      // fallback 也失败就算了
+    }
+  }
+
+  const hkQuotes = eastmoneyFailed ? hkFallbackQuotes : eastmoneyQuotes;
+  const hkError =
+    eastmoneyFailed && Object.keys(hkFallbackQuotes).length === 0
+      ? eastmoneyError
       : "";
 
   // A 股 / 美股（Tencent）
@@ -438,17 +470,17 @@ export async function fetchQuotesForWatchlist(watchlist) {
     });
   });
 
-  // 港股（Eastmoney）
+  // 港股（Eastmoney，东财挂了回退腾讯）
   if (hkStocks.length) {
     marketStatus.hk = {
       loading: false,
-      error: eastmoneyError,
-      lastUpdated: eastmoneyError ? null : fetchedAt
+      error: hkError,
+      lastUpdated: hkError ? null : fetchedAt
     };
-    if (eastmoneyError) {
+    if (hkError) {
       hkStocks.forEach((stock) => {
         quotes[stock.id] = {
-          error: eastmoneyError,
+          error: hkError,
           market: "hk",
           symbol: stock.symbol,
           fetchedAt
@@ -456,7 +488,7 @@ export async function fetchQuotesForWatchlist(watchlist) {
       });
     } else {
       hkStocks.forEach((stock) => {
-        const quote = eastmoneyQuotes[stock.symbol];
+        const quote = hkQuotes[stock.symbol];
         if (!quote || quote.error) {
           quotes[stock.id] = {
             error: quote?.error || "未返回有效行情",
